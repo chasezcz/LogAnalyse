@@ -44,12 +44,21 @@ class HttpEvent(object):
         self.parameter = content[14]
         self.parameterValue = "".join(content[i]
                                       for i in range(15, len(content)-4))
-
+        self.parameterValue.replace(" ", ",")
         self.port = content[len(content) - 1]
         self.ip = content[len(content) - 2]
         self.name = content[len(content) - 3]
-        self.header = content[len(content) - 4]
+        self.header = content[len(content) - 4].replace(" ", ",")
 
+        originLog = " ".join(
+            [" ".join(content[:14]),
+             self.parameterValue,
+             self.header,
+             self.name,
+             self.ip,
+             self.port,
+             "\n"]
+        )
         if saveOriginData:
             self.originLog = originLog
 

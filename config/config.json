@@ -1,4 +1,6 @@
 {
   "dataPath": "D:\\Workspace\\LogAnalyse\\data",
-  "generateTrainingData": false
+  "generateTrainingData": false,
+  "isSortByUsers": false,
+  "isCluster": false
 }

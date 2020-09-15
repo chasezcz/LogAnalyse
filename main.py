@@ -55,11 +55,24 @@ def preSolve(files):
     originData = list()
     trainingData = list()
 
+    userDataPath = os.path.join(Config.getValue("dataPath"), "output", "users")
+
+    if Config.getValue("isSortByUsers"):
+        if not os.path.exists(userDataPath):
+            os.makedirs(userDataPath)
+
     for user in users:
         sessions = Session.getSessionsFromHttpEvents(users[user])
+        filename = os.path.join(
+            userDataPath, "{0}-{1}.log".format(sessions[0].httpEvents[0].name, user))
+
         for session in sessions:
             originData.extend(session.getOriginData())
             trainingData.extend(session.getTrainData())
+            if Config.getValue("isSortByUsers"):
+                with open(filename, "a+", encoding="utf-8") as target:
+                    target.writelines(session.getOriginData())
+                    target.write("\n")
 
     outputDataPath = os.path.join(
         Config.getValue("dataPath"), "output", "trainData")
@@ -136,13 +149,14 @@ if __name__ == "__main__":
     # print(len(originData))
 
     print("开始聚类")
+    if Config.getValue("isCluster"):
+        dimension, numOfClusters = 100, 95
+        labels, inertia = clustering(dimension, numOfClusters, os.path.join(
+            Config.getValue("dataPath"), "output"))
 
-    dimension, numOfClusters = 100, 95
-    labels, inertia = clustering(dimension, numOfClusters, os.path.join(
-        Config.getValue("dataPath"), "output"))
-
-    if len(labels) != len(originData):
-        print("数据不匹配, originData: {0}, labels: {1}".format(
-            len(originData), len(labels)))
-    else:
-        sortOriginData(originData, labels, dimension, numOfClusters)
+        if len(labels) != len(originData):
+            print("数据不匹配, originData: {0}, labels: {1}".format(
+                len(originData), len(labels)))
+        else:
+            sortOriginData(originData, labels, dimension, numOfClusters)
+``
