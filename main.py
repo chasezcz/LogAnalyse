@@ -13,6 +13,7 @@ from config.config import Config
 from logUtils.httpEvent import HttpEvent
 from logUtils.session import Session
 from classify.logClassify import clustering
+import matplotlib.pyplot as plt
 
 
 def getFilesByPath(path):
@@ -149,14 +150,41 @@ if __name__ == "__main__":
     # print(len(originData))
 
     print("开始聚类")
-    if Config.getValue("isCluster"):
-        dimension, numOfClusters = 100, 95
-        labels, inertia = clustering(dimension, numOfClusters, os.path.join(
-            Config.getValue("dataPath"), "output"))
 
-        if len(labels) != len(originData):
-            print("数据不匹配, originData: {0}, labels: {1}".format(
-                len(originData), len(labels)))
-        else:
-            sortOriginData(originData, labels, dimension, numOfClusters)
-``
+    numOfClusterss = []
+    inertias = []
+    silhouettes = []
+
+    if Config.getValue("isCluster"):
+        dimension = Config.getValue("dimension")
+        for numOfClusters in range(100, 200, 50):
+            labels, inertia, silhouette = clustering(dimension, numOfClusters, os.path.join(
+                Config.getValue("dataPath"), "output"))
+            numOfClusterss.append(numOfClusters)
+            inertias.append(inertia)
+            silhouettes.append(silhouette)
+
+            if len(labels) != len(originData):
+                print("数据不匹配, originData: {0}, labels: {1}".format(
+                    len(originData), len(labels)))
+            else:
+                sortOriginData(originData, labels, dimension, numOfClusters)
+    print(numOfClusterss)
+    print(inertias)
+    print(silhouettes)
+    # 中文和负号的正常显示
+    plt.rcParams['font.sans-serif'] = [u'SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    # 设置绘图风格
+    plt.style.use('ggplot')
+    # 绘制K的个数与轮廓系数的关系
+    plt.plot(numOfClusterss, silhouettes, 'b*-')
+    plt.xlabel("k值一簇数量")
+    plt.ylabel("轮廓系数")
+
+    plt.savefig("data/output/model/output.png", format='png',
+                transparent=True, dpi=300, pad_inches=0)
+    plt.plot(numOfClusterss, inertias, 'b*-')
+    plt.ylabel("Inertia")
+    plt.savefig("data/output/model/inertias.png", format='png',
+                transparent=True, dpi=300, pad_inches=0)

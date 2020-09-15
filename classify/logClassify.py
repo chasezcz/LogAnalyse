@@ -9,7 +9,7 @@ from gensim.models.word2vec import LineSentence
 
 from sklearn.cluster import KMeans
 from sklearn.externals import joblib
-
+from sklearn.metrics import silhouette_score
 
 dataPath = ""
 
@@ -174,6 +174,8 @@ def clustering(dimension: int, numOfClusters: int, path):
     labelPred = estimator.labels_  # 获取聚类标签
     centroids = estimator.cluster_centers_  # 获取聚类中心
     inertia = estimator.inertia_  # 获取聚类准则的总和
+    # 轮廓系数
+    silhouette = silhouette_score(data, labelPred, metric="euclidean")
 
     joblib.dump(estimator, os.path.join(
         modelDataPath, "model-{0}.pkl".format(inertia)))
@@ -191,4 +193,4 @@ def clustering(dimension: int, numOfClusters: int, path):
         for i in range(numOfClusters):
             fw.write("{0},{1}\n".format(i, clusters[i]))
 
-    return labelPred, inertia
+    return labelPred, inertia, silhouette
