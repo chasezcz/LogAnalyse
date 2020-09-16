@@ -3,5 +3,8 @@
   "generateTrainingData": false,
   "isSortByUsers": false,
   "isCluster": true,
-  "dimension": 200
+  "dimension": 10,
+  "numOfClustersStart": 100,
+  "numOfClustersEnd": 5000,
+  "numOfClustersStartStep": 100
 }

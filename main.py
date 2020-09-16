@@ -157,7 +157,8 @@ if __name__ == "__main__":
 
     if Config.getValue("isCluster"):
         dimension = Config.getValue("dimension")
-        for numOfClusters in range(100, 200, 50):
+        for numOfClusters in range(Config.getValue("numOfClustersStart"), Config.getValue("numOfClustersEnd"), Config.getValue("numOfClustersStep")):
+            print("正在训练，K={0}".format(numOfClusters))
             labels, inertia, silhouette = clustering(dimension, numOfClusters, os.path.join(
                 Config.getValue("dataPath"), "output"))
             numOfClusterss.append(numOfClusters)
@@ -182,9 +183,12 @@ if __name__ == "__main__":
     plt.xlabel("k值一簇数量")
     plt.ylabel("轮廓系数")
 
-    plt.savefig("data/output/model/output.png", format='png',
+    plt.savefig("data/output/model/silhouttes-{0}.png".format(numOfClusters), format='png',
                 transparent=True, dpi=300, pad_inches=0)
-    plt.plot(numOfClusterss, inertias, 'b*-')
+    plt.clf()
+
+    plt.plot(numOfClusterss, inertias, 'o-')
+    plt.xlabel("k值一簇数量")
     plt.ylabel("Inertia")
-    plt.savefig("data/output/model/inertias.png", format='png',
+    plt.savefig("data/output/model/inertias-{0}.png".format(numOfClusters), format='png',
                 transparent=True, dpi=300, pad_inches=0)
