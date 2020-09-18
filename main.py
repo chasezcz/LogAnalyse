@@ -40,27 +40,21 @@ def preSolve(files):
     for file in files:
         with open(file, 'r', encoding='utf-8') as f:
             # 按行读取
-            while True:
-                line = f.readline()  # 逐行读取
-                if not line:  # 到 EOF，返回空字符串，则终止循环
-                    break
+            for line in f:
                 try:
                     he = HttpEvent(line, True)
-                    if not he.userId in users:
-                        users[he.userId] = list()
-                    users[he.userId].append(he)
-
                 except Exception as e:
                     continue
+                users[he.userId].append(he) if (
+                    he.userId in users) else users.setdefault(he.userId, list())
 
-    originData = list()
-    trainingData = list()
-
+    # 如果按照user分割的话，创建对应文件夹
     userDataPath = os.path.join(Config.getValue("dataPath"), "output", "users")
-
     if Config.getValue("isSortByUsers"):
         if not os.path.exists(userDataPath):
             os.makedirs(userDataPath)
+
+    originData, trainDataList = list(), list()
 
     for user in users:
         sessions = Session.getSessionsFromHttpEvents(users[user])
@@ -69,7 +63,8 @@ def preSolve(files):
 
         for session in sessions:
             originData.extend(session.getOriginData())
-            trainingData.extend(session.getTrainData())
+            trainDataList.extend(session.getTrainData())
+
             if Config.getValue("isSortByUsers"):
                 with open(filename, "a+", encoding="utf-8") as target:
                     target.writelines(session.getOriginData())
@@ -84,35 +79,10 @@ def preSolve(files):
     with open(os.path.join(outputDataPath, "originLog.log"), "w", encoding="utf-8") as f:
         f.writelines(originData)
 
-    # 保存训练所用的信息
-    with open(os.path.join(outputDataPath, "dates.txt"), "w", encoding="utf-8") as f:
-        for line in trainingData:
-            f.write("{0}\n".format(line[0]))
-    with open(os.path.join(outputDataPath, "urls.txt"), "w", encoding="utf-8") as f:
-        for line in trainingData:
-            ss = line[1].split("/")
-            for s in ss:
-                if s != "":
-                    f.write(s + " ")
-            f.write("\n")
-    with open(os.path.join(outputDataPath, "parameters.txt"), "w", encoding="utf-8") as f:
-        for line in trainingData:
-            ss = line[2].strip("[").strip("]").replace("\"", "").split(",")
-            count = 0
-            for s in ss:
-                if s != "":
-                    count += 1
-                    f.write(s + " ")
-            if count == 0:
-                f.write("null")
-            f.write("\n")
-
-    with open(os.path.join(outputDataPath, "methods.txt"), "w", encoding="utf-8") as f:
-
-        for line in trainingData:
-            f.write(str(line[3])+"\n")
-
-    return originData
+    trainData = pd.DataFrame(data=trainDataList,  columns=[
+        "dates", "urls", "parameters", "methods"])
+    trainData.to_csv(os.path.join(outputDataPath, "data.csv"))
+    return originData, trainData
 
 
 def sortOriginData(originData, labels, dimension, numOfClusters):
@@ -138,57 +108,74 @@ def sortOriginData(originData, labels, dimension, numOfClusters):
 
 
 if __name__ == "__main__":
-    originData = []
+    originData, trainData = [], []
     files = getFilesByPath(os.path.join(
         Config.getValue("dataPath"), "origin"))
 
     if Config.getValue("generateTrainingData"):
-        originData = preSolve(files)
+        originData, trainData = preSolve(files)
     else:
-        with open(os.path.join(Config.getValue("dataPath"), "output", "trainData", "originLog.log"), 'r', encoding="utf-8") as target:
-            originData = target.read().splitlines()
-    # print(len(originData))
+        if Config.getValue("isCombineCSV"):
+            with open(os.path.join(Config.getValue("dataPath"), "output", "trainData", "originLog.log"), 'r', encoding="utf-8") as target:
+                originData = target.read().splitlines()
+        trainData = pd.read_csv(
+            os.path.join(Config.getValue("dataPath"),
+                         "output", "trainData", "data.csv"),
+            dtype={"dates": np.str, "urls": np.str, "parameters": np.str, "methods": np.str})
 
-    print("开始聚类")
-
-    numOfClusterss = []
-    inertias = []
-    silhouettes = []
+    # print(trainData.head())
 
     if Config.getValue("isCluster"):
+        print("开始聚类")
+        # 生成所有要训练的 K 值
+        ks = [i for i in range(Config.getValue("numOfClustersStart"), Config.getValue(
+            "numOfClustersEnd"), Config.getValue("numOfClustersStep"))]
+        inertias, silhouettes, calinskiHarabazs = [], [], []
         dimension = Config.getValue("dimension")
-        for numOfClusters in range(Config.getValue("numOfClustersStart"), Config.getValue("numOfClustersEnd"), Config.getValue("numOfClustersStep")):
+
+        for numOfClusters in ks:
             print("正在训练，K={0}".format(numOfClusters))
-            labels, inertia, silhouette = clustering(dimension, numOfClusters, os.path.join(
-                Config.getValue("dataPath"), "output"))
-            numOfClusterss.append(numOfClusters)
+            labels, inertia, silhouette, calinskiHarabaz = clustering(
+                trainData, dimension, numOfClusters)
+
             inertias.append(inertia)
             silhouettes.append(silhouette)
+            calinskiHarabazs.append(calinskiHarabaz)
 
-            if len(labels) != len(originData):
-                print("数据不匹配, originData: {0}, labels: {1}".format(
-                    len(originData), len(labels)))
-            else:
-                sortOriginData(originData, labels, dimension, numOfClusters)
-    print(numOfClusterss)
-    print(inertias)
-    print(silhouettes)
-    # 中文和负号的正常显示
-    plt.rcParams['font.sans-serif'] = [u'SimHei']
-    plt.rcParams['axes.unicode_minus'] = False
-    # 设置绘图风格
-    plt.style.use('ggplot')
-    # 绘制K的个数与轮廓系数的关系
-    plt.plot(numOfClusterss, silhouettes, 'b*-')
-    plt.xlabel("k值一簇数量")
-    plt.ylabel("轮廓系数")
+            if Config.getValue("isCombineCSV"):
+                if len(labels) != len(originData):
+                    print("数据不匹配, originData: {0}, labels: {1}".format(
+                        len(originData), len(labels)))
+                else:
+                    sortOriginData(originData, labels,
+                                   dimension, numOfClusters)
 
-    plt.savefig("data/output/model/silhouttes-{0}.png".format(numOfClusters), format='png',
-                transparent=True, dpi=300, pad_inches=0)
-    plt.clf()
+        print(ks)
+        print(inertias)
+        print(silhouettes)
+        # 中文和负号的正常显示
+        plt.rcParams['font.sans-serif'] = [u'SimHei']
+        plt.rcParams['axes.unicode_minus'] = False
+        # 设置绘图风格
+        plt.style.use('ggplot')
+        # 绘制K的个数与轮廓系数的关系
 
-    plt.plot(numOfClusterss, inertias, 'o-')
-    plt.xlabel("k值一簇数量")
-    plt.ylabel("Inertia")
-    plt.savefig("data/output/model/inertias-{0}.png".format(numOfClusters), format='png',
-                transparent=True, dpi=300, pad_inches=0)
+        plt.plot(ks, silhouettes, 'b*-')
+        plt.xlabel("k值一簇数量")
+        plt.ylabel("轮廓系数")
+        plt.savefig(os.path.join(Config.getValue("dataPath"), "output", "model", "silhouttes-{0}.png".format(dimension)), format='png',
+                    transparent=True, dpi=300, pad_inches=0)
+        plt.clf()
+
+        plt.plot(ks, inertias, 'o-')
+        plt.xlabel("k值一簇数量")
+        plt.ylabel("Inertia")
+        plt.savefig(os.path.join(Config.getValue("dataPath"), "output", "model", "inertia-{0}.png".format(dimension)), format='png',
+                    transparent=True, dpi=300, pad_inches=0)
+        plt.clf()
+
+        plt.plot(ks, calinskiHarabazs, 'o-')
+        plt.xlabel("k值一簇数量")
+        plt.ylabel("CH系数")
+        plt.savefig(os.path.join(Config.getValue("dataPath"), "output", "model", "calinskiHarabaz-{0}.png".format(dimension)), format='png',
+                    transparent=True, dpi=300, pad_inches=0)

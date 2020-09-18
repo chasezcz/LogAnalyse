@@ -3,23 +3,22 @@ import os.path
 import sys
 import multiprocessing
 import numpy as np
+import joblib
 
 from gensim.models import Word2Vec
 from gensim.models.word2vec import LineSentence
 
 from sklearn.cluster import KMeans
-from sklearn.externals import joblib
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, calinski_harabasz_score
 
-dataPath = ""
+from config.config import Config
 
 
-def word2vec(dimension: int, modelDataPath: str):
+def word2vec(trainData, dimension: int, modelDataPath: str):
     """ 根据维度生成向量文件
     :param dimension: 生成的向量文件 
     :return: none
     """
-
     program = "word2vec"
 
     logger = logging.getLogger(program)
@@ -30,12 +29,9 @@ def word2vec(dimension: int, modelDataPath: str):
     logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
     logging.root.setLevel(level=logging.ERROR)
 
-    projectNames = ["dates.txt", "methods.txt", "parameters.txt", "urls.txt"]
-
-    for name in projectNames:
-        input = os.path.join(dataPath, "trainData", name)
-        output = os.path.join(modelDataPath, name+".vector")
-
+    models, vectors = dict(), list()
+    # 分别训练词向量
+    for name in trainData:
         '''
         LineSentence(inp)：格式简单：一句话=一行; 单词已经过预处理并被空格分隔。
         size：是每个词的向量维度； 
@@ -46,126 +42,47 @@ def word2vec(dimension: int, modelDataPath: str):
         alpha (float, optional) – 初始学习率
         iter (int, optional) – 迭代次数，默认为5
         '''
-        model = Word2Vec(LineSentence(input), size=dimension, window=10,
-                         min_count=1, workers=multiprocessing.cpu_count())
-        # model.save(out1)
-        # #不以C语言可以解析的形式存储词向量
-        model.wv.save_word2vec_format(output, binary=False)
+        models[name] = Word2Vec(
+            trainData[name], size=dimension, window=10, min_count=1)
+        # 模型保存
+        # model[name].wv.save_word2vec_format(output, binary=False)
+
+    def getSentenceVector(sentence, name):
+        words = sentence.split(" ")
+        vector = sum(
+            [
+                models[name][word] if word in models[name] else np.random.uniform(0, 1, dimension) for word in words
+            ]
+        ) / (len(words) + 0.01)
+        if len(sentence) == 0 or sentence == "null":
+            vector = np.random.uniform(0, 1, dimension)
+
+        return vector
+
+    # 合成句向量
+    for index in range(len(trainData)):
+
+        line = trainData.loc[index]
+        vector = (getSentenceVector(line["dates"], "dates") + (
+            (getSentenceVector(line["urls"], "urls") +
+             getSentenceVector(line["parameters"], "parameters") +
+             getSentenceVector(line["methods"], "methods")
+             )/3.0)
+        )/2.0
+        vectors.append(vector)
+
+    return vectors
 
 
-# 例子data = np.random.rand(100, 8) #生成一个随机数据，样本大小为100, 特征数为8
-def get_word_embeddings(is_delete_label, word_embeddings_file):  # 获得word_embeddings
-    word_embeddings = {}
-    f = open(word_embeddings_file, encoding='utf-8')
-    flag = True
-    for line in f:
-        # 把第一行的内容去掉
-        if is_delete_label and flag:
-            flag = False
-            continue
+def clustering(trainData, dimension: int, numOfClusters: int):
 
-        values = line.split()
-        # 第一个元素是词语
-        word = values[0]
-        embedding = np.asarray(values[1:], dtype='float32')
-        word_embeddings[word] = embedding
+    modelDataPath = os.path.join(Config.getValue(
+        "dataPath"), "output", "model", "{0}-{1}".format(dimension, numOfClusters))
 
-    f.close()
-    # print("一共有" + str(len(word_embeddings)) + "个词。")
-    return word_embeddings
-
-
-def get_sentences(sentences_file):  # 获得句子 list
-    with open(sentences_file, 'r') as fs:
-        sentences = fs.readlines()
-    return sentences
-
-
-# sentences is list ，获得句向量
-def get_sentence_vector(sentences, word_embeddings, dimension, stopwords=None):
-    sentence_vectors = []  # 句子向量
-    for i in sentences:
-        if len(i) != 0:
-            v = sum([word_embeddings.get(w, np.random.uniform(0, 1, dimension))
-                     for w in i]) / (len(i) + 0.001)
-        else:
-            v = np.random.uniform(0, 1, dimension)
-        sentence_vectors.append(v)
-    return sentence_vectors
-
-
-def get_sent_vec(is_delete_label, word_embeddings_file, sentences_file, dimension):
-    word_embeddings = get_word_embeddings(
-        is_delete_label, word_embeddings_file)
-    sentences = get_sentences(sentences_file)
-    sent_vec = get_sentence_vector(
-        sentences, word_embeddings, dimension=dimension)
-    return sent_vec
-
-# ------------------------------------文件路径参数-----------------------------------------------------------
-# .vector和.txt文件路径
-
-
-def combineVector(modelDataPath, dimension):
-    trainDataPath = os.path.join(dataPath, "trainData")
-    params_word_embeddings_file = os.path.join(
-        modelDataPath, "parameters.txt.vector")
-    params_sentences_file = os.path.join(trainDataPath, "parameters.txt")
-
-    methods_word_embeddings_file = os.path.join(
-        modelDataPath, 'methods.txt.vector')
-    methods_sentences_file = os.path.join(
-        trainDataPath, 'methods.txt')  # methods 的文本的 文件路径
-
-    urls_word_embeddings_file = os.path.join(modelDataPath, 'urls.txt.vector')
-    urls_sentences_file = os.path.join(
-        trainDataPath, 'urls.txt')  # url 的文本的 文件路径
-
-    dates_word_embeddings_file = os.path.join(
-        modelDataPath, "dates.txt.vector")
-    dates_sentences_file = os.path.join(trainDataPath, "dates.txt")
-
-# ----------------------------------获得句向量------------------------------------------------------
-    # 获得params句向量
-    params_sent_vec = get_sent_vec(
-        True, params_word_embeddings_file, params_sentences_file, dimension)
-    # 获得methods句向量
-    methods_sent_vec = get_sent_vec(
-        True, methods_word_embeddings_file, methods_sentences_file, dimension)
-    # 获得url句向量
-    urls_sent_vec = get_sent_vec(
-        True, urls_word_embeddings_file, urls_sentences_file, dimension)
-
-    # 获得url、methods、params共同作为操作行为的句向量
-    seg_sent_vec = []  # 操作参数为：url、methods和params的三个加权平均
-    for i in range(len(params_sent_vec)):
-        a_sent_vec = (params_sent_vec[i] +
-                      methods_sent_vec[i]+urls_sent_vec[i])/3
-        seg_sent_vec.append(a_sent_vec)
-
-    # 获得dates句向量
-    dates_sent_vec = get_sent_vec(
-        True, dates_word_embeddings_file, dates_sentences_file, dimension)
-
-    # 获得dates、操作行为 共同作为一条消息的句向量
-    all_sent_vec = []  # 共为：dates和操作参数的加权平均
-    for i in range(len(seg_sent_vec)):
-        a_sent_vec = (seg_sent_vec[i]+dates_sent_vec[i])/2
-        all_sent_vec.append(a_sent_vec)
-    return all_sent_vec
-
-
-def clustering(dimension: int, numOfClusters: int, path):
-    global dataPath
-    dataPath = path
-    modelDataPath = os.path.join(
-        dataPath, "model", "{0}-{1}".format(dimension, numOfClusters))
     if not os.path.exists(modelDataPath):
         os.makedirs(modelDataPath)
 
-    word2vec(dimension, modelDataPath)
-
-    data = combineVector(modelDataPath, dimension)
+    data = word2vec(trainData, dimension, modelDataPath)
 
     estimator = KMeans(n_clusters=numOfClusters,
                        algorithm="full")  # 构造聚类器，分为100类
@@ -176,7 +93,8 @@ def clustering(dimension: int, numOfClusters: int, path):
     inertia = estimator.inertia_  # 获取聚类准则的总和
     # 轮廓系数
     silhouette = silhouette_score(data, labelPred, metric="euclidean")
-
+    # CH 系数
+    calinskiHarabaz = calinski_harabasz_score(data, labelPred)
     joblib.dump(estimator, os.path.join(
         modelDataPath, "model-{0}.pkl".format(inertia)))
 
@@ -193,4 +111,4 @@ def clustering(dimension: int, numOfClusters: int, path):
         for i in range(numOfClusters):
             fw.write("{0},{1}\n".format(i, clusters[i]))
 
-    return labelPred, inertia, silhouette
+    return labelPred, inertia, silhouette, calinskiHarabaz

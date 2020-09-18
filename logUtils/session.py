@@ -8,6 +8,7 @@
 import datetime
 from logUtils.httpEvent import HttpEvent
 
+
 class Session(object):
 
     def __init__(self, ):
@@ -20,10 +21,37 @@ class Session(object):
             originData.append(he.originLog)
         return originData
 
+    # def getTrainData(self, dates, urls, parameters, methods):
+
+    #     for he in self.httpEvents:
+    #         dates.append(
+    #             str((he.date-self.firstHttpEventDate).microseconds / 1000))
+
+    #         urls.append(he.url.replace("/", " ").strip())
+    #         parameter = he.parameter[1:-1].replace("\"", "").split(",")
+    #         parameters.append("null") if len(
+    #             parameter) == 0 else parameters.append(" ".join(parameter))
+
+    #         methods.append(he.method)
+
     def getTrainData(self):
-        data = list()
+        """ 获取需要训练的四个维度数据"""
+        data = []
         for he in self.httpEvents:
-            data.append((int((he.date-self.firstHttpEventDate).microseconds/1000), he.url, he.parameter, he.method))
+            hData = []
+            hData.append(
+                str((he.date-self.firstHttpEventDate).microseconds / 1000))
+
+            hData.append(he.url.replace("/", " ").strip())
+
+            parameter = he.parameter.strip("[").strip("]").replace(
+                "\"", "").split(",")
+            hData.append("null") if len(
+                parameter) == 1 and len(parameter[0]) == 0 else hData.append(" ".join(parameter))
+
+            hData.append(he.method)
+            data.append(hData)
+
         return data
 
     @staticmethod
@@ -40,7 +68,7 @@ class Session(object):
                 sessionsByHeader[header] = Session()
             sessionsByHeader[header].httpEvents.append(he)
         sessions = list(sessionsByHeader.values())
-        
+
         def taketime(elem):
             return elem.date.timestamp()
 
