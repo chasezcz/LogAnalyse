@@ -40,9 +40,10 @@ class Session(object):
         for he in self.httpEvents:
             hData = []
             hData.append(
-                str((he.date-self.firstHttpEventDate).microseconds / 1000))
+                str(int((he.date-self.firstHttpEventDate).microseconds / 1000)))
 
-            hData.append(he.url.replace("/", " ").strip())
+            url = he.url.replace("/", " ").strip()
+            hData.append("null") if len(url) < 2 else hData.append(url)
 
             parameter = he.parameter.strip("[").strip("]").replace(
                 "\"", "").split(",")

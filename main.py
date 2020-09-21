@@ -81,7 +81,7 @@ def preSolve(files):
 
     trainData = pd.DataFrame(data=trainDataList,  columns=[
         "dates", "urls", "parameters", "methods"])
-    trainData.to_csv(os.path.join(outputDataPath, "data.csv"))
+    trainData.to_csv(os.path.join(outputDataPath, "data.csv"), index=False)
     return originData, trainData
 
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
         trainData = pd.read_csv(
             os.path.join(Config.getValue("dataPath"),
                          "output", "trainData", "data.csv"),
-            dtype={"dates": np.str, "urls": np.str, "parameters": np.str, "methods": np.str})
+            dtype={"dates": str, "urls": str, "parameters": str, "methods": str}, keep_default_na=False)
 
     # print(trainData.head())
 
