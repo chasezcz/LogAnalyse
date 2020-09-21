@@ -8,7 +8,7 @@ import joblib
 from gensim.models import Word2Vec
 from gensim.models.word2vec import LineSentence
 
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.metrics import silhouette_score, calinski_harabasz_score
 
 from config.config import Config
@@ -84,8 +84,14 @@ def clustering(trainData, dimension: int, numOfClusters: int):
 
     data = word2vec(trainData, dimension, modelDataPath)
 
-    estimator = KMeans(n_clusters=numOfClusters,
-                       algorithm="full")  # 构造聚类器，分为100类
+    # 如果样本量小于 1w，则使用默认的聚类方法
+    # estimator = KMeans(n_clusters=numOfClusters,
+    #                    algorithm="full")  # 构造聚类器，分为100类
+
+    # 如果样本量大于 1w，使用分批次聚类方法
+    estimator = MiniBatchKMeans(
+        n_clusters=numOfClusters, batch_size=Config.getValue("batch"))
+
     estimator.fit(data)  # 聚类
 
     labelPred = estimator.labels_  # 获取聚类标签
