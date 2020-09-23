@@ -84,7 +84,7 @@ def preSolve(files):
     trainData = pd.DataFrame(data=trainDataList,  columns=[
         "dates", "urls", "parameters", "methods"])
     trainData.to_csv(os.path.join(outputDataPath, "data.csv"), index=False)
-    return originData, trainData
+    return trainData
 
 
 def sortOriginData(originData, labels, dimension, numOfClusters):
@@ -111,19 +111,23 @@ def sortOriginData(originData, labels, dimension, numOfClusters):
 
 if __name__ == "__main__":
     originData, trainData = [], []
-    files = getFilesByPath(os.path.join(
-        Config.getValue("dataPath"), "origin"))
 
     if Config.getValue("generateTrainingData"):
-        originData, trainData = preSolve(files)
+        # 生成训练素材
+        files = getFilesByPath(os.path.join(
+            Config.getValue("dataPath"), "origin"))
+        trainData = preSolve(files)
     else:
-        if Config.getValue("isCombineCSV"):
-            with open(os.path.join(Config.getValue("dataPath"), "output", "trainData", "originLog.log"), 'r', encoding="utf-8") as target:
-                originData = target.read().splitlines()
+        # 读取存在的训练素材
         trainData = pd.read_csv(
             os.path.join(Config.getValue("dataPath"),
                          "output", "trainData", "data.csv"),
             dtype={"dates": str, "urls": str, "parameters": str, "methods": str}, keep_default_na=False)
+
+    if Config.getValue("isCombineCSV"):
+        # 如有合并结果的需求，再读取，否则不读取，节省内存
+        with open(os.path.join(Config.getValue("dataPath"), "output", "trainData", "originLog.log"), 'r', encoding="utf-8") as target:
+            originData = target.read().splitlines()
 
     if Config.getValue("isCluster"):
         log("启动聚类")

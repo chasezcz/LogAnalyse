@@ -21,12 +21,12 @@ def clustering(data, dimension: int, numOfClusters: int):
 
     log("正在聚类")
     # 如果样本量小于 1w，则使用默认的聚类方法
-    estimator = KMeans(n_clusters=numOfClusters,
-                       algorithm="full", n_jobs=-1, copy_x=False)  # 构造聚类器，分为100类
+    # estimator = KMeans(n_clusters=numOfClusters,
+    #                    algorithm="full", n_jobs=-1, copy_x=False)  # 构造聚类器，分为100类
 
     # 如果样本量大于 1w，使用分批次聚类方法
-    # estimator = MiniBatchKMeans(
-    #     n_clusters=numOfClusters, batch_size=Config.getValue("batch"))
+    estimator = MiniBatchKMeans(
+        n_clusters=numOfClusters, batch_size=Config.getValue("batch"))
 
     estimator.fit(data)  # 聚类
 

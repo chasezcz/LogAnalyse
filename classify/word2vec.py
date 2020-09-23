@@ -36,6 +36,10 @@ def word2vec(trainData, dimension: int):
         vectorss = np.load(vectorFileName)
         log("存在已训练的向量文件，直接读取：" + str(vectorss.shape))
         return vectorss
+    else:
+        os.makedirs(os.path.join(Config.getValue(
+            "dataPath"), "output", "vector"))
+
     models, vectors = dict(), list()
     # 分别训练词向量
 
