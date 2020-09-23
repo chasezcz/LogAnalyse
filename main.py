@@ -6,14 +6,16 @@
 # @Contact :   chengze1996@gmail.com
 # Here put the import lib.
 
+import os
 import pandas as pd
 import numpy as np
-import os
+import matplotlib.pyplot as plt
 from config.config import Config
 from logUtils.httpEvent import HttpEvent
 from logUtils.session import Session
+from logUtils.logger import log
 from classify.logClassify import clustering
-import matplotlib.pyplot as plt
+from classify.word2vec import word2vec
 
 
 def getFilesByPath(path):
@@ -123,20 +125,21 @@ if __name__ == "__main__":
                          "output", "trainData", "data.csv"),
             dtype={"dates": str, "urls": str, "parameters": str, "methods": str}, keep_default_na=False)
 
-    # print(trainData.head())
-
     if Config.getValue("isCluster"):
-        print("开始聚类")
+        log("启动聚类")
+
+        dimension = Config.getValue("dimension")
+        data = word2vec(trainData, dimension)
+
         # 生成所有要训练的 K 值
         ks = [i for i in range(Config.getValue("numOfClustersStart"), Config.getValue(
             "numOfClustersEnd"), Config.getValue("numOfClustersStep"))]
         inertias, silhouettes, calinskiHarabazs = [], [], []
-        dimension = Config.getValue("dimension")
 
         for numOfClusters in ks:
-            print("正在训练，K={0}".format(numOfClusters))
+            log("正在训练，K={0}".format(numOfClusters))
             labels, inertia, silhouette, calinskiHarabaz = clustering(
-                trainData, dimension, numOfClusters)
+                data, dimension, numOfClusters)
 
             inertias.append(inertia)
             silhouettes.append(silhouette)
@@ -144,15 +147,16 @@ if __name__ == "__main__":
 
             if Config.getValue("isCombineCSV"):
                 if len(labels) != len(originData):
-                    print("数据不匹配, originData: {0}, labels: {1}".format(
+                    log("数据不匹配, originData: {0}, labels: {1}".format(
                         len(originData), len(labels)))
                 else:
                     sortOriginData(originData, labels,
                                    dimension, numOfClusters)
 
-        print(ks)
-        print(inertias)
-        print(silhouettes)
+        log(ks)
+        log(inertias)
+        log(silhouettes)
+        log(calinskiHarabazs)
         # 中文和负号的正常显示
         plt.rcParams['font.sans-serif'] = [u'SimHei']
         plt.rcParams['axes.unicode_minus'] = False
