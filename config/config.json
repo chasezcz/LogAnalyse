@@ -1,8 +1,8 @@
 {
   "保存数据的地址": "",
-  "dataPath": "D:\\Workspace\\LogAnalyse\\data",
+  "dataPath": "/home/chase/LogAnalyse/data",
   "是否重新生成训练数据，包括 dates, methods, parameters, urls": "",
-  "generateTrainingData": false,
+  "generateTrainingData": true,
   "对日志文件是否按照 user 进行分割，并保存到 user 文件夹下": "",
   "isSortByUsers": false,
   "是否进行聚类": "",
